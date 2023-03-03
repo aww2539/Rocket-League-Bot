@@ -4,5 +4,8 @@
   "editor.formatOnSave": true,
   "python.linting.pylintEnabled": true,
   "python.linting.enabled": true,
+  "cSpell.words": [
+    "atba"
+  ],
   "python.formatting.provider": "black"
 }

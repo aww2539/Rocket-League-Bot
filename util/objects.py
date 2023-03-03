@@ -6,6 +6,7 @@ from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 # This file holds all of the objects used in gosling utils
 # Includes custom vector and matrix objects
 
+
 class GoslingAgent(BaseAgent):
     # This is the main object of Gosling Utils. It holds/updates information about the game and runs routines
     # All utils rely on information being structured and accessed the same way as configured in this class
@@ -23,9 +24,7 @@ class GoslingAgent(BaseAgent):
         # goals
         self.friend_goal = goal_object(self.team)
         self.foe_goal = goal_object(not self.team)
-        # A list that acts as the routines stack
-        self.stack = []
-        # A routine
+        # Where we store the bot's current objective
         self.intent = None
         # Game time
         self.time = 0.0
@@ -41,8 +40,7 @@ class GoslingAgent(BaseAgent):
         field_info = self.get_field_info()
         for i in range(field_info.num_boosts):
             boost = field_info.boost_pads[i]
-            self.boosts.append(boost_object(
-                i, boost.location, boost.is_full_boost))
+            self.boosts.append(boost_object(i, boost.location))
         self.refresh_player_lists(packet)
         self.ball.update(packet)
         self.ready = True
@@ -50,35 +48,49 @@ class GoslingAgent(BaseAgent):
     def refresh_player_lists(self, packet):
         # makes new freind/foe lists
         # Useful to keep separate from get_ready because humans can join/leave a match
-        self.friends = [car_object(i, packet) for i in range(packet.num_cars) if
-                        packet.game_cars[i].team == self.team and i != self.index]
-        self.foes = [car_object(i, packet) for i in range(
-            packet.num_cars) if packet.game_cars[i].team != self.team]
+        self.friends = [
+            car_object(i, packet)
+            for i in range(packet.num_cars)
+            if packet.game_cars[i].team == self.team and i != self.index
+        ]
+        self.foes = [
+            car_object(i, packet)
+            for i in range(packet.num_cars)
+            if packet.game_cars[i].team != self.team
+        ]
 
     def set_intent(self, routine):
         self.intent = routine
 
+    def get_intent(self):
+        return self.intent
+
+    def clear_intent(self):
+        self.intent = None
+
     def push(self, routine):
         # Shorthand for adding a routine to the stack
-        # self.stack.append(routine)
-        self.set_intent(routine)
+        self.set_intent(routine=routine)
+
+    def pop(self):
+        # Shorthand for removing a routine from the stack, returns the routine
+        return self.clear_intent()
 
     def line(self, start, end, color=None):
         color = color if color != None else [255, 255, 255]
         self.renderer.draw_line_3d(
-            start.copy(), end.copy(), self.renderer.create_color(255, *color))
+            start.copy(), end.copy(), self.renderer.create_color(255, *color)
+        )
 
-    def debug_stack(self):
+    def debug_intent(self):
         # Draws the stack on the screen
         white = self.renderer.white()
-        for i in range(len(self.stack) - 1, -1, -1):
-            text = self.stack[i].__class__.__name__
-            self.renderer.draw_string_2d(
-                10, 50 + (50 * (len(self.stack) - i)), 3, 3, text, white)
+        text = self.get_intent().__class__.__name__
+        self.renderer.draw_string_2d(10, 100, 3, 3, text, white)
 
-    def clear_intent(self):
-        # Shorthand for clearing intent
-        self.intent = None
+    def clear(self):
+        # Shorthand for clearing the stack of all routines
+        self.clear_intent()
 
     def preprocess(self, packet):
         # Calling the update functions for all of the objects
@@ -95,10 +107,16 @@ class GoslingAgent(BaseAgent):
         self.game.update(packet)
         self.time = packet.game_info.seconds_elapsed
         # When a new kickoff begins we empty the stack
-        if self.kickoff_flag == False and packet.game_info.is_round_active and packet.game_info.is_kickoff_pause:
+        if (
+            self.kickoff_flag == False
+            and packet.game_info.is_round_active
+            and packet.game_info.is_kickoff_pause
+        ):
             self.clear_intent()
         # Tells us when to go for kickoff
-        self.kickoff_flag = packet.game_info.is_round_active and packet.game_info.is_kickoff_pause
+        self.kickoff_flag = (
+            packet.game_info.is_round_active and packet.game_info.is_kickoff_pause
+        )
 
     def get_output(self, packet):
         # Reset controller
@@ -112,8 +130,9 @@ class GoslingAgent(BaseAgent):
         # Run our strategy code
         self.run()
         # run the routine on the end of the stack
-        if self.intent is not None:
-            self.intent.run(self)
+        intent = self.get_intent()
+        if intent is not None:
+            intent.run(self)
         self.renderer.end_rendering()
         # send our updated controller back to rlbot
         return self.controller
@@ -147,14 +166,28 @@ class car_object:
 
     def update(self, packet):
         car = packet.game_cars[self.index]
-        self.location.data = [car.physics.location.x,
-                              car.physics.location.y, car.physics.location.z]
-        self.velocity.data = [car.physics.velocity.x,
-                              car.physics.velocity.y, car.physics.velocity.z]
+        self.location.data = [
+            car.physics.location.x,
+            car.physics.location.y,
+            car.physics.location.z,
+        ]
+        self.velocity.data = [
+            car.physics.velocity.x,
+            car.physics.velocity.y,
+            car.physics.velocity.z,
+        ]
         self.orientation = Matrix3(
-            car.physics.rotation.pitch, car.physics.rotation.yaw, car.physics.rotation.roll)
+            car.physics.rotation.pitch,
+            car.physics.rotation.yaw,
+            car.physics.rotation.roll,
+        )
         self.angular_velocity = self.orientation.dot(
-            [car.physics.angular_velocity.x, car.physics.angular_velocity.y, car.physics.angular_velocity.z]).data
+            [
+                car.physics.angular_velocity.x,
+                car.physics.angular_velocity.y,
+                car.physics.angular_velocity.z,
+            ]
+        ).data
         self.demolished = car.is_demolished
         self.airborne = not car.has_wheel_contact
         self.supersonic = car.is_super_sonic
@@ -187,20 +220,27 @@ class ball_object:
 
     def update(self, packet):
         ball = packet.game_ball
-        self.location.data = [ball.physics.location.x,
-                              ball.physics.location.y, ball.physics.location.z]
-        self.velocity.data = [ball.physics.velocity.x,
-                              ball.physics.velocity.y, ball.physics.velocity.z]
+        self.location.data = [
+            ball.physics.location.x,
+            ball.physics.location.y,
+            ball.physics.location.z,
+        ]
+        self.velocity.data = [
+            ball.physics.velocity.x,
+            ball.physics.velocity.y,
+            ball.physics.velocity.z,
+        ]
         self.latest_touched_time = ball.latest_touch.time_seconds
         self.latest_touched_team = ball.latest_touch.team
 
 
 class boost_object:
-    def __init__(self, index, location, large):
+    def __init__(self, index, location):
         self.index = index
         self.location = Vector3(location.x, location.y, location.z)
         self.active = True
-        self.large = large
+        # determine boost size by height (only works for standard maps)
+        self.large = self.location.z > 7
 
     def update(self, packet):
         self.active = packet.game_boosts[self.index].is_active
@@ -255,14 +295,17 @@ class Matrix3:
         self.data = (
             Vector3(cp * cy, cp * sy, sp),
             Vector3(cy * sp * sr - cr * sy, sy * sp * sr + cr * cy, -cp * sr),
-            Vector3(-cr * cy * sp - sr * sy, -cr * sy * sp + sr * cy, cp * cr))
+            Vector3(-cr * cy * sp - sr * sy, -cr * sy * sp + sr * cy, cp * cr),
+        )
         self.forward, self.left, self.up = self.data
 
     def __getitem__(self, key):
         return self.data[key]
 
     def dot(self, vector):
-        return Vector3(self.forward.dot(vector), self.left.dot(vector), self.up.dot(vector))
+        return Vector3(
+            self.forward.dot(vector), self.left.dot(vector), self.up.dot(vector)
+        )
 
 
 class Vector3:
@@ -377,13 +420,18 @@ class Vector3:
 
     def magnitude(self):
         # Magnitude() returns the length of the vector
-        return math.sqrt((self[0] * self[0]) + (self[1] * self[1]) + (self[2] * self[2]))
+        return math.sqrt(
+            (self[0] * self[0]) + (self[1] * self[1]) + (self[2] * self[2])
+        )
 
     def normalize(self):
         # Normalize() returns a Vector3 that shares the same direction but has a length of 1.0
-        # Normalize(True) can also be used if you'd like the length of this Vector3 (used for optimization)
         magnitude = self.magnitude()
-        return Vector3(self[0] / magnitude, self[1] / magnitude, self[2] / magnitude)
+        if magnitude != 0:
+            return Vector3(
+                self[0] / magnitude, self[1] / magnitude, self[2] / magnitude
+            )
+        return Vector3(0, 0, 0)
 
     # Linear algebra functions
     def dot(self, value):
@@ -391,8 +439,11 @@ class Vector3:
 
     def cross(self, value):
         # A .cross((0, 0, 1)) will rotate the vector counterclockwise by 90 degrees
-        return Vector3((self[1] * value[2]) - (self[2] * value[1]), (self[2] * value[0]) - (self[0] * value[2]),
-                       (self[0] * value[1]) - (self[1] * value[0]))
+        return Vector3(
+            (self[1] * value[2]) - (self[2] * value[1]),
+            (self[2] * value[0]) - (self[0] * value[2]),
+            (self[0] * value[1]) - (self[1] * value[0]),
+        )
 
     def flatten(self):
         # Sets Z (Vector3[2]) to 0
@@ -408,13 +459,18 @@ class Vector3:
 
     def angle(self, value):
         # Returns the angle between this Vector3 and another Vector3
-        return math.acos(round(self.flatten().normalize().dot(value.flatten().normalize()), 4))
+        return math.acos(
+            round(self.flatten().normalize().dot(value.flatten().normalize()), 4)
+        )
 
     def rotate(self, angle):
         # Rotates this Vector3 by the given angle in radians
         # Note that this is only 2D, in the x and y axis
-        return Vector3((math.cos(angle) * self[0]) - (math.sin(angle) * self[1]),
-                       (math.sin(angle) * self[0]) + (math.cos(angle) * self[1]), self[2])
+        return Vector3(
+            (math.cos(angle) * self[0]) - (math.sin(angle) * self[1]),
+            (math.sin(angle) * self[0]) + (math.cos(angle) * self[1]),
+            self[2],
+        )
 
     def clamp(self, start, end):
         # Similar to integer clamping, Vector3's clamp() forces the Vector3's direction between a start and end Vector3
@@ -423,7 +479,11 @@ class Vector3:
         s = self.normalize()
         right = s.dot(end.cross((0, 0, -1))) < 0
         left = s.dot(start.cross((0, 0, -1))) > 0
-        if (right and left) if end.dot(start.cross((0, 0, -1))) > 0 else (right or left):
+        if (
+            (right and left)
+            if end.dot(start.cross((0, 0, -1))) > 0
+            else (right or left)
+        ):
             return self
         if start.dot(s) < end.dot(s):
             return end
