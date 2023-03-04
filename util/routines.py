@@ -493,7 +493,7 @@ class kickoff:
         target = agent.ball.location + Vector3(0, 200 * side(agent.team), 0)
         local_target = agent.me.local(target - agent.me.location)
         defaultPD(agent, local_target)
-        defaultThrottle(agent, 2300)
+        defaultThrottle(agent, 2500)
         if local_target.magnitude() < 650:
             # flip towards opponent goal
             agent.set_intent(
@@ -568,3 +568,55 @@ class short_shot:
 
         if abs(angles[1]) < 0.05 and (eta < 0.45 or distance < 150):
             agent.set_intent(flip(agent.me.local(car_to_ball)))
+
+
+# class kill:
+#     # Find closest foe car. Kill closest foe car
+#     # WIP
+#
+#     def __init__(self, target):
+#         self.target = target
+
+#     def run(self, agent):
+#         car_to_ball = (agent.ball.location - agent.me.location).normalize()
+#         distance = (agent.ball.location - agent.me.location).magnitude()
+#         ball_to_target = (self.target - agent.ball.location).normalize()
+
+#         relative_velocity = car_to_ball.dot(agent.me.velocity - agent.ball.velocity)
+#         if relative_velocity != 0.0:
+#             eta = cap(distance / cap(relative_velocity, 400, 2300), 0.0, 1.5)
+#         else:
+#             eta = 1.5
+
+#         # If we are approaching the ball from the wrong side the car will try to only hit the very edge of the ball
+#         left_vector = car_to_ball.cross((0, 0, 1))
+#         right_vector = car_to_ball.cross((0, 0, -1))
+#         target_vector = -ball_to_target.clamp(left_vector, right_vector)
+#         final_target = agent.ball.location + (target_vector * (distance / 2))
+
+#         # Some adjustment to the final target to ensure we don't try to dirve through any goalposts to reach it
+#         if abs(agent.me.location[1]) > 5150:
+#             final_target[0] = cap(final_target[0], -750, 750)
+
+#         agent.line(
+#             final_target - Vector3(0, 0, 100),
+#             final_target + Vector3(0, 0, 100),
+#             [255, 255, 255],
+#         )
+
+#         angles = defaultPD(agent, agent.me.local(final_target - agent.me.location))
+#         defaultThrottle(
+#             agent,
+#             2300 if distance > 1600 else 2300 - cap(1600 * abs(angles[1]), 0, 2050),
+#         )
+#         agent.controller.boost = (
+#             False
+#             if agent.me.airborne or abs(angles[1]) > 0.3
+#             else agent.controller.boost
+#         )
+#         agent.controller.handbrake = (
+#             True if abs(angles[1]) > 2.3 else agent.controller.handbrake
+#         )
+
+#         if abs(angles[1]) < 0.05 and (eta < 0.45 or distance < 150):
+#             agent.set_intent(flip(agent.me.local(car_to_ball)))

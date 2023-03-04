@@ -8,16 +8,10 @@ class Bot(GoslingAgent):
 
     def run(self):
 
-        # d1_foe_goal = abs(self.me.location.y - self.foe_goal.location.y)
+        if self.time % 2 == 0:
 
-        # d1_friend_goal = abs(self.me.location.y - self.friend_goal.location.y)
-
-        # b1_foe_goal = abs(self.ball.location.y - self.foe_goal.location.y)
-
-        # b1_friend_goal = abs(self.ball.location.y - self.friend_goal.location.y)
-
-        # in_front_of_ball = d1_foe_goal < b1_foe_goal
-        # behind_ball = d1_foe_goal >= b1_foe_goal
+            self.is_on_defense()
+            self.rotate_back_post()
 
         if self.get_intent() is not None:
             return
@@ -35,7 +29,36 @@ class Bot(GoslingAgent):
             ),
         }
 
+        my_boost_amount = self.me.boost
+        closest_boost = self.get_closest_large_boost()
+
         hits = find_hits(self, targets)
+
+        if self.is_in_front_of_ball() and self.is_on_defense():
+            print("return to net")
+            if self.at_goal():
+                self.set_intent(hits["at_opponent_goal"][0])
+                print("at opponent goal")
+                return
+            elif self.rotate_back_post() == "left":
+                print("rotate back right post")
+                self.set_intent(goto(self.friend_goal.left_post_rotation))
+                return
+            else:
+                print("rotate back left post")
+
+                self.set_intent(goto(self.friend_goal.right_post_rotation))
+                return
+            return
+
+        if (
+            closest_boost is not None
+            and my_boost_amount < 10
+            and not self.is_on_defense()
+        ):
+            self.set_intent(goto(closest_boost.location))
+            print("going for boost")
+            return
 
         if len(hits["at_opponent_goal"]) > 0:
             self.set_intent(hits["at_opponent_goal"][0])
@@ -46,16 +69,3 @@ class Bot(GoslingAgent):
             self.set_intent(hits["away_from_friend_goal"][0])
             print("away from my goal")
             return
-
-        if self.time % 2 == 0:
-            print(hits)
-
-        # self.set_intent(atba())
-
-        # if in_front_of_ball:
-        #     self.set_intent(goto(self.friend_goal.location))
-        #     return
-
-        # self.set_intent(short_shot(self.foe_goal.location))
-
-        # self.set_intent(atba())

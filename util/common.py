@@ -49,10 +49,13 @@ def defaultThrottle(agent, target_speed, direction=1.0):
     agent.controller.throttle = cap((t**2) * sign(t) / 1000, -1.0, 1.0)
     agent.controller.boost = (
         True
-        if t > 150 and car_speed < 2275 and agent.controller.throttle == 1.0
+        if t > 150
+        and car_speed < 2600
+        and agent.controller.throttle == 1.0
+        and agent.me.supersonic == False
         else False
     )
-    return car_speed
+    return
 
 
 def in_field(point, radius):

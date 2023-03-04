@@ -137,6 +137,61 @@ class GoslingAgent(BaseAgent):
         # send our updated controller back to rlbot
         return self.controller
 
+    def get_closest_large_boost(self):
+        available_boosts = [
+            boost for boost in self.boosts if boost.large and boost.active
+        ]
+
+        closest_boost = None
+        closest_distance = 10000
+
+        for boost in available_boosts:
+            distance = (self.me.location - boost.location).magnitude()
+
+            if closest_boost is None or distance < closest_distance:
+                closest_boost = boost
+                closest_distance = distance
+
+        return closest_boost
+
+    def is_in_front_of_ball(self):
+        me_to_foe_goal = (self.me.location - self.foe_goal.location).magnitude()
+        ball_to_foe_goal = (self.ball.location - self.foe_goal.location).magnitude()
+
+        if me_to_foe_goal < ball_to_foe_goal + 1000:
+            return True
+
+        return False
+
+    def is_on_defense(self):
+        me_to_foe_goal = (self.me.location - self.foe_goal.location).magnitude()
+        ball_to_foe_goal = (self.ball.location - self.foe_goal.location).magnitude()
+        foe_to_foe_goal = (self.foes[0].location - self.foe_goal.location).magnitude()
+
+        me_to_ball = me_to_foe_goal - ball_to_foe_goal
+        foe_to_ball = foe_to_foe_goal - ball_to_foe_goal
+
+        if (abs(me_to_ball) + 500 > abs(foe_to_ball)) and self.ball.location.y < 0:
+            print("on defense")
+            return True
+        else:
+            print("on offense")
+            return False
+
+    def rotate_back_post(self):
+        ball_on_left_side = self.ball.location.x > 0
+
+        if ball_on_left_side:
+            return "left"
+        else:
+            return "right"
+
+    def at_goal(self):
+        print("at goal")
+        if abs((self.me.location - self.friend_goal.location).magnitude()) < 1200:
+            return True
+        return False
+
     def run(self):
         # override this with your strategy code
         pass
@@ -254,6 +309,9 @@ class goal_object:
         # Posts are closer to x=750, but this allows the bot to be a little more accurate
         self.left_post = Vector3(team * 850, team * 5100, 320)
         self.right_post = Vector3(-team * 850, team * 5100, 320)
+
+        self.left_post_rotation = Vector3(team * 650, team * 4700, 320)
+        self.right_post_rotation = Vector3(-team * 650, team * 4700, 320)
 
 
 class game_object:
